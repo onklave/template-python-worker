@@ -39,7 +39,10 @@ Or use the `Makefile` targets: `make install`, `make run`, `make test`.
 
 ## How Onklave runs it
 
-Onklave builds this repo **from the `Dockerfile`** and runs the resulting image
-as a background **worker** (no port is exposed or expected). The container runs
-as a non-root user and starts with `python -m worker.main`. Configure behaviour
-through environment variables (see the table above).
+Onklave reads **`onklave.yaml`** at the repo root — that is where this service is
+declared (GitHub Actions is not used). It builds the repo from the `Dockerfile`
+and runs the resulting image as a background **worker**: `onklave.yaml` sets
+`expose.enabled: false` with no port or health path, because this process serves
+no HTTP. The container runs as a non-root user and starts with
+`python -m worker.main`. Configure behaviour through environment variables (see
+the table above).
