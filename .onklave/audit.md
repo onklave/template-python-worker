@@ -39,6 +39,11 @@ here propagate to every app created from it.
 | Non-root runtime | `docker run --entrypoint sh … -c 'id'` | Pass — `uid=10001(worker) gid=10001(worker)` |
 | Graceful shutdown | `docker stop -t 30 <container>` | Pass — logged "received SIGTERM, shutting down", exited in 0.15s with exit code 0 |
 | Secrets in history | `git grep -E '(api[_-]?key\|secret\|password\|token\|BEGIN .* PRIVATE KEY\|AKIA…)' $(git rev-list --all)` | Pass — no matches in any commit |
+| Install + tests after adding the major ceiling (reconciliation) | `docker run python:3.13-slim … pip install -e '.[dev]' && pytest` | Pass — resolved pytest 9.1.1, **9 passed in 0.06s** |
+| Ceiling does not exclude the current release (reconciliation) | `pip index versions pytest` | Latest is 9.1.1; `>=9.1.1,<10` admits it and every future 9.x |
+
+The last two rows are from the **cross-template reconciliation pass** (2026-08-04,
+same audit date). See finding 2.
 
 ## Dependency status
 The template declares **no runtime dependencies** — the worker is pure standard
@@ -46,7 +51,7 @@ library. The only declared dependency is the `dev` extra.
 
 | Package | Before | After | Note |
 |---|---|---|---|
-| pytest (declared) | `>=8` | `>=9` | Floor raised to the tested major. `>=8` already resolved to 9.1.1, so this records reality rather than changing it. |
+| pytest (declared) | `>=8` | `>=9.1.1,<10` | Floor raised to the tested release, then a major ceiling added in the reconciliation pass to match `template-fastapi`'s convention. `>=8` already resolved to 9.1.1, so the floor records reality; the ceiling is the new constraint. |
 | pytest (resolved) | 9.1.1 | 9.1.1 | Latest. |
 | pluggy | 1.6.0 | 1.6.0 | Latest (transitive). |
 | packaging | 26.2 | 26.2 | Latest (transitive). |
@@ -62,8 +67,10 @@ Deliberately **not** changed:
   Finding 1.
 - **`requires-python` left at `>=3.12`.** The image is 3.13, but there is no reason
   to stop a developer running the app locally on 3.12.
-- **No version pinning / lockfile added.** See Finding 2 — this is a decision for
-  the generated app, not for a zero-runtime-dependency template.
+- **No lockfile added.** See Finding 2 — a lockfile is a decision for the generated
+  app, not for a zero-runtime-dependency template. (Major *ceilings* were added in the
+  reconciliation pass; that is a weaker and cheaper control than a lockfile and does
+  not replace one.)
 
 ## Findings
 
@@ -75,14 +82,26 @@ Deliberately **not** changed:
    revisit at the next quarterly review and move to 3.14 once it is the ecosystem
    default.
 
-2. **(low) No dependency pinning or lockfile.** `pyproject.toml` uses floor
-   constraints only (`pytest>=9`) and there is no lockfile, so two builds of the
-   same commit can resolve different versions. For this template the blast radius is
-   near zero — no runtime dependencies, one dev tool — and floating gets security
-   patches for free. It stops being acceptable the moment a generated app takes real
-   runtime dependencies. *Action taken:* none. *Recommended:* generated apps that add
-   runtime dependencies should adopt a lockfile (`uv.lock`, `pip-tools`, or a
-   `constraints.txt`) and a `--require-hashes` install in the Dockerfile.
+2. **(low) No dependency pinning or lockfile — PARTIALLY ADDRESSED in the
+   reconciliation pass.** `pyproject.toml` used floor constraints only (`pytest>=9`)
+   and there is no lockfile, so two builds of the same commit can resolve different
+   versions. For this template the blast radius is near zero — no runtime
+   dependencies, one dev tool — and floating gets security patches for free. It stops
+   being acceptable the moment a generated app takes real runtime dependencies.
+   *Action originally taken:* none.
+   *Action taken in the reconciliation pass:* `template-fastapi` was audited
+   independently on the same date and adopted **floor + major ceiling**
+   (`fastapi>=0.141.1,<1.0`, `pytest>=9.1.1,<10`) with an explanatory comment, while
+   this template kept a bare floor. Two Python templates teaching two different
+   dependency conventions is the kind of drift that propagates into every generated
+   app, so this one was aligned to the stricter of the two: `pytest>=9.1.1,<10`, with
+   the same comment. The ceiling does not undercut the "floating gets patches for
+   free" argument above — patch and minor releases, which is where security fixes
+   ship, still flow in automatically; only an unreviewed *major* is blocked. Re-ran
+   the suite after the change: 9 passed.
+   *Still recommended:* generated apps that add real runtime dependencies should
+   adopt a lockfile (`uv.lock`, `pip-tools`, or a `constraints.txt`) and a
+   `--require-hashes` install in the Dockerfile. A major ceiling is not a lockfile.
 
 3. **(low) Distribution name `worker` collides with an unrelated package on PyPI.**
    `pip list --outdated` reports `worker 0.1.0 → 2018.4.1` because a package literally
@@ -124,7 +143,11 @@ Deliberately **not** changed:
 ## Changes made in this audit
 - Dockerfile: base image `python:3.12-slim` → `python:3.13-slim`.
 - `pyproject.toml`: `dev` extra floor `pytest>=8` → `pytest>=9`; dropped the now-stale
-  "(Python 3.12)" from the project description.
+  "(Python 3.12)" from the project description. Then, in the cross-template
+  reconciliation pass (finding 2): `pytest>=9` → `pytest>=9.1.1,<10`, plus the
+  floor/ceiling rationale comment, adopting `template-fastapi`'s convention so the two
+  Python templates teach the same dependency-constraint style. Tests re-run green
+  (9 passed) on `python:3.13-slim` after the change.
 - `.dockerignore`: added `.env`, `.env.*`, `*.pem`, `*.key`.
 - `.gitignore`: added `.env`, `.env.*`, `*.pem`, `*.key`.
 - `README.md`: replaced the hardcoded "Python 3.12" framing with a supported-version
@@ -138,4 +161,8 @@ Deliberately **not** changed:
   third-party wheel availability for generated apps.
 - Decide whether to rename the distribution away from the PyPI-colliding name
   `worker` (Finding 3). This changes the console-script name, so it needs a human.
+- **Bump the `pytest` floor when the ceiling is next reviewed.** `>=9.1.1,<10` is
+  correct today; the point of the ceiling is that a human sees pytest 10 before it
+  lands, so this needs the quarterly review to actually happen (it is the same
+  automation gap noted across the template fleet).
 - No action required on `onklave.yaml` — deliberately untouched, verified previously.
