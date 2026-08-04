@@ -1,0 +1,15 @@
+# Onklave reads this file to build, run and deploy this repo.
+# It is the only place a service is declared — GitHub Actions is not used.
+# This service is NOT exposed: it is a background worker that serves no HTTP.
+# To add a second service, add another entry under `services`.
+version: 1
+services:
+  - name: app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    runtime:
+      port: null
+      healthPath: null
+    expose:
+      enabled: false

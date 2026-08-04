@@ -21,6 +21,12 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Local secrets — never commit these
+.env
+.env.*
+*.pem
+*.key
+
 # Editor / OS
 .idea/
 .vscode/

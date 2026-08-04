@@ -5,14 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "worker"
 version = "0.1.0"
-description = "Onklave containerised background worker (Python 3.12)"
+description = "Onklave containerised background worker"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Proprietary" }
+# Constrained, not frozen: floors keep generated apps off known-old releases,
+# ceilings stop a surprise major breaking a build months from now. Patch/minor
+# security fixes still flow in automatically.
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=9.1.1,<10"]
 
 [project.scripts]
 worker = "worker.main:main"

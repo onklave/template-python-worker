@@ -10,3 +10,9 @@ __pycache__
 .mypy_cache
 tests
 Makefile
+
+# Never ship local secrets or credentials into an image layer.
+.env
+.env.*
+*.pem
+*.key
