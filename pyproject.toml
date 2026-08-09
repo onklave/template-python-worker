@@ -12,7 +12,9 @@ license = { text = "Proprietary" }
 # Constrained, not frozen: floors keep generated apps off known-old releases,
 # ceilings stop a surprise major breaking a build months from now. Patch/minor
 # security fixes still flow in automatically.
-dependencies = []
+dependencies = [
+  "onklave>=0.1.0,<1.0",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=9.1.1,<10"]

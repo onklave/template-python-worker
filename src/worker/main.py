@@ -9,6 +9,8 @@ Run locally:
 Configuration (environment variables):
     WORKER_INTERVAL_SECONDS  Seconds between ticks (default: 30)
     LOG_LEVEL                Python log level name (default: INFO)
+    APP_NAME                 Service name reported to Onklave error
+                             tracking (default: onklave-python-worker)
 """
 
 from __future__ import annotations
@@ -19,6 +21,8 @@ import signal
 import sys
 import threading
 from dataclasses import dataclass
+
+import onklave
 
 logger = logging.getLogger("worker")
 
@@ -83,6 +87,7 @@ def run(config: Config, stop: threading.Event) -> int:
             do_work(tick)
         except Exception:  # noqa: BLE001 - keep the loop alive on tick errors
             logger.exception("tick %d failed", tick)
+            onklave.capture_exception(context={"tick": tick})
         # Interruptible sleep: wakes immediately when stop is set.
         stop.wait(config.interval_seconds)
     logger.info("worker stopped cleanly after %d tick(s)", tick)
@@ -92,6 +97,9 @@ def run(config: Config, stop: threading.Event) -> int:
 def main(argv: list[str] | None = None) -> int:
     config = Config.from_env()
     configure_logging(config.log_level)
+
+    # Silent no-op without an ONKLAVE_ERRORS_INGEST_KEY (local dev).
+    onklave.init(service_name=os.environ.get("APP_NAME", "onklave-python-worker"))
 
     stop = threading.Event()
 
@@ -103,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, _handle_signal)
 
     run(config, stop)
+    onklave.flush(timeout=5)
     return 0
 
 
